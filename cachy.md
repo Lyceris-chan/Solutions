@@ -1,28 +1,26 @@
-# CachyOS Configuration and Troubleshooting Guide
+# CachyOS configuration and troubleshooting guide
 
 This guide provides optional configuration steps and troubleshooting fixes for 
-system stability, hardware, and gaming performance on CachyOS. These are 
-personal preferences and recommendations based on experience. Apply only the 
+system stability, hardware, and gaming performance on CachyOS. Apply only the 
 configurations that are relevant to your specific hardware and use case.
 
 ## System optimization
 
 ### Remove Plymouth boot splash (optional)
 
-Plymouth can cause boot hangs and increase boot time on some systems. This is 
-an optional optimization.
+Plymouth can cause boot hangs and increase boot time on some systems.
 
 **Source:** [CachyOS Forum](https://discuss.cachyos.org/t/tutorial-disable-or-remove-plymouth-boot-splash/10922)
 
 To remove Plymouth:
 
-1.  Remove Plymouth packages:
+1.  Remove the Plymouth packages:
 
     ```bash
     sudo pacman -Rns plymouth-git plymouth-kcm cachyos-plymouth-theme cachyos-plymouth-bootanimation
     ```
 
-2.  Edit `/etc/mkinitcpio.conf` and remove `plymouth` from the `HOOKS` array.
+2.  Open `/etc/mkinitcpio.conf` and remove `plymouth` from the `HOOKS` array.
 
 3.  Rebuild the initramfs:
 
@@ -30,7 +28,7 @@ To remove Plymouth:
     sudo mkinitcpio -P
     ```
 
-### Configure bootloader (optional)
+### Configure the bootloader (optional)
 
 You can reduce boot delay and set the default boot entry:
 
@@ -51,45 +49,44 @@ LINUX_OPTIONS="zswap.enabled=0 nowatchdog gpiolib_acpi.ignore_interrupt=AMDI0030
 
 **Parameter explanations:**
 
-- `zswap.enabled=0` - Disables the zswap compressed swap cache. Disabling 
-  zswap can improve performance and reduce memory overhead on systems with 
-  adequate RAM.
+*   `zswap.enabled=0`: Disables the zswap compressed swap cache. If you have 
+    adequate RAM, disabling zswap can improve performance and reduce memory 
+    overhead.
 
-- `nowatchdog` - Disables hardware watchdog timers. Watchdog timers can cause 
-  unexpected system reboots or boot delays if they trigger incorrectly.
+*   `nowatchdog`: Disables hardware watchdog timers. Watchdog timers can cause 
+    unexpected system reboots or boot delays if they trigger incorrectly.
 
-- `gpiolib_acpi.ignore_interrupt=AMDI0030:00@3,AMDI0030:00@10` - Ignores 
-  specific GPIO interrupts from the AMDI0030 ACPI device. These GPIO pins can 
-  cause spurious wakeups from suspend, which prevents your system from staying 
-  asleep. The specific pins (3 and 10) are known to trigger false wake events 
-  on Ryzen 7000 series systems.
-  
-  **Source:** [Arch Linux Wiki - Power Management Wakeup Triggers (Ryzen 7000 Series)](https://wiki.archlinux.org/title/Power_management/Wakeup_triggers#Ryzen_7000_Series)
-  
-  **For Ryzen 7000 series users:** If you have a Ryzen 7000 series CPU and 
-  experience suspend issues, consult the Arch Wiki source above. The page 
-  explains how to identify which specific GPIO pins are causing wakeup problems 
-  on your system. The page also documents other common causes of broken suspend 
-  and their solutions.
+*   `gpiolib_acpi.ignore_interrupt=AMDI0030:00@3,AMDI0030:00@10`: Ignores 
+    specific GPIO interrupts from the AMDI0030 ACPI device. These GPIO pins can 
+    cause spurious wakeups from suspend, which prevents your system from staying 
+    asleep. The specific pins (3 and 10) are known to trigger false wake events 
+    on Ryzen 7000 series systems.
+    
+    **Source:** [Arch Linux Wiki - Power management/Wakeup triggers (Ryzen 7000 Series)](https://wiki.archlinux.org/title/Power_management/Wakeup_triggers#Ryzen_7000_Series)
+    
+    **For Ryzen 7000 series users:** If you have a Ryzen 7000 series CPU and 
+    experience suspend issues, consult the Arch Wiki source. The page 
+    explains how to identify which specific GPIO pins are causing wakeup 
+    problems on your system. The page also documents other common causes of 
+    broken suspend and their solutions.
 
-- `mem_sleep_default=deep` - Sets the default suspend mode to deep sleep (S3). 
-  Deep sleep provides better power savings during suspend compared to shallow 
-  sleep modes.
+*   `mem_sleep_default=deep`: Sets the default suspend mode to deep sleep (S3). 
+    Deep sleep provides better power savings during suspend compared to shallow 
+    sleep modes.
 
-- `quiet` - Reduces boot messages shown on screen for a cleaner boot experience.
+*   `quiet`: Reduces boot messages shown on screen for a cleaner boot 
+    experience.
 
 ### Remove systemd timeout configuration (optional)
 
 Strict systemd timeouts can cause slow shutdowns or boot delays on some 
-systems.
-
-To remove the timeout configuration:
+systems. To remove the timeout configuration:
 
 ```bash
 sudo rm /usr/lib/systemd/system.conf.d/00-timeout.conf
 ```
 
-### Configure time synchronization (preference)
+### Configure time synchronization (optional)
 
 This configuration removes connections to Cloudflare and Google NTP servers 
 and uses only the Arch Linux NTP pool. This is a personal preference to avoid 
@@ -104,6 +101,110 @@ sudo sed -i \
   /usr/lib/systemd/timesyncd.conf.d/10-timesyncd.conf
 
 sudo systemctl restart systemd-timesyncd
+```
+
+### Override DNS configuration to use your router or Pi-hole (recommended)
+
+CachyOS uses systemd-resolved for DNS management with NetworkManager. By 
+default, CachyOS may use Cloudflare DNS (1.1.1.1) through configurations set 
+by the CachyOS Hello application. If you want to use your router's DNS or a 
+local Pi-hole/Unbound setup instead, you can override the DNS configuration 
+without disabling systemd-resolved or modifying package-managed files.
+
+**Why use drop-in configs:** CachyOS Hello and the `cachyos-settings` package 
+manage DNS settings in `/usr/lib/` directories. If you directly edit those 
+files, package updates will cause conflicts. Instead, use drop-in configuration 
+files in `/etc/systemd/resolved.conf.d/`, which take precedence and persist 
+across updates.
+
+**What this preserves:** This approach keeps systemd-resolved enabled, which 
+provides DNS caching and other useful features, while routing all DNS queries 
+through your specified server.
+
+**Sources:**
+
+*   [CachyOS Forum - Hello DNS settings disable](https://discuss.cachyos.org/t/cachyos-hello-dns-settings-disable/19731)
+*   [Arch Linux Wiki - systemd-resolved](https://wiki.archlinux.org/title/Systemd-resolved)
+
+To configure DNS to use your router or Pi-hole:
+
+1.  Create the drop-in configuration directory if it doesn't exist:
+
+    ```bash
+    sudo mkdir -p /etc/systemd/resolved.conf.d
+    ```
+
+2.  Create a new configuration file with high priority. The `zz-` prefix 
+    ensures it loads last and overrides other configs:
+
+    ```bash
+    sudo nano /etc/systemd/resolved.conf.d/zz-custom-dns.conf
+    ```
+
+3.  Add the following content. Replace `192.168.1.1` with your router's IP 
+    address or Pi-hole IP:
+
+    ```ini
+    [Resolve]
+    DNS=192.168.1.1
+    #FallbackDNS=
+    Domains=~.
+    ```
+
+    **Parameter explanations:**
+
+    *   `DNS=192.168.1.1`: Sets your primary DNS server (router or Pi-hole).
+    *   `#FallbackDNS=`: Disables fallback DNS, which prevents falling back to 
+        Cloudflare or Google. If you want fallback DNS, remove the comment 
+        character.
+    *   `Domains=~.`: Routes all DNS queries through the specified DNS server. 
+        The `~.` (tilde-dot) means "route all domains through this DNS."
+
+4.  Restart systemd-resolved to apply changes:
+
+    ```bash
+    sudo systemctl restart systemd-resolved
+    ```
+
+5.  Verify your DNS configuration:
+
+    ```bash
+    resolvectl status
+    ```
+
+    The output should show your specified DNS server. Look for:
+    
+    ```text
+    Global
+      DNS Servers: 192.168.1.1
+      DNS Domain: ~.
+    ```
+
+6.  (Optional) Test DNS resolution to confirm it's using your DNS server:
+
+    ```bash
+    resolvectl query google.com
+    ```
+
+    The output shows which interface and DNS server was used for the query.
+
+**Note:** The CachyOS Hello application may still show Cloudflare or other DNS 
+providers in its interface, but your drop-in configuration overrides those 
+settings. The Hello app settings don't affect your actual DNS configuration 
+when you use drop-in files.
+
+**Troubleshooting:** If DNS isn't working after these changes, verify that 
+`/etc/resolv.conf` is properly symlinked:
+
+```bash
+ls -l /etc/resolv.conf
+```
+
+It should point to `/run/systemd/resolve/stub-resolv.conf`. If it doesn't:
+
+```bash
+sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+sudo systemctl restart systemd-resolved
 ```
 
 ### Automount secondary drives (optional)
@@ -139,11 +240,11 @@ To configure automount:
     ```
 
 **Important:** The mount point path must exist before you add the fstab entry. 
-If the path doesn't exist, the automount will fail.
+If the path doesn't exist, the automount fails.
 
-### Fix Polkit authentication on COSMIC DE
+### Fix Polkit authentication on COSMIC desktop environment
 
-Admin dialog boxes might not accept input on COSMIC Desktop Environment.
+Admin dialog boxes might not accept input on COSMIC desktop environment.
 
 **Source:** [CachyOS Forum](https://discuss.cachyos.org/t/polkit-authentication-issue-with-cosmic-desktop-environment/20592)
 
@@ -159,28 +260,31 @@ sudo chmod 4755 /usr/lib/polkit-1/polkit-agent-helper-1
 
 Avahi is a zeroconf implementation that enables service discovery on local 
 networks using mDNS (multicast DNS). It implements Apple's Bonjour/Zeroconf 
-protocol, allowing automatic discovery of printers, file shares, and other 
+protocol, which allows automatic discovery of printers, file shares, and other 
 network services without manual configuration.
 
 **Source:** [Arch Linux Wiki - Avahi](https://wiki.archlinux.org/title/Avahi)
 
 **What Avahi is used for:**
-- Automatic network printer discovery
-- .local hostname resolution (e.g., `hostname.local`)
-- Network service discovery (SSH, VNC, file shares)
-- Bonjour protocol support for applications
-- Zero-configuration networking
+
+*   Automatic network printer discovery
+*   `.local` hostname resolution (for example, `hostname.local`)
+*   Network service discovery (SSH, VNC, file shares)
+*   Bonjour protocol support for applications
+*   Zero-configuration networking
 
 **Why you might want to disable it:**
-- Not needed if you don't use .local hostnames or network service discovery
-- Reduces attack surface on systems that don't need network service advertising
-- Prevents unnecessary mDNS traffic on port 5353
-- systemd-resolved provides similar functionality in some configurations
-- Boot time optimization (minor)
 
-**Important:** Avahi is a dependency for many essential packages including 
+*   Not needed if you don't use `.local` hostnames or network service discovery
+*   Reduces attack surface on systems that don't need network service 
+    advertising
+*   Prevents unnecessary mDNS traffic on port 5353
+*   systemd-resolved provides similar functionality in some configurations
+*   Boot time optimization (minor)
+
+**Important:** Avahi is a dependency for many essential packages, including 
 `pipewire-pulse`, `libcups`, `geoclue`, and various desktop applications. 
-**Do not attempt to remove the Avahi package** as this will break critical 
+**Don't attempt to remove the Avahi package** because this breaks critical 
 system functionality. Only disable the daemon if you don't use network service 
 discovery features.
 
@@ -204,8 +308,8 @@ To disable and mask the Avahi daemon:
     sudo systemctl mask avahi-daemon.service avahi-daemon.socket
     ```
 
-4.  (Optional) Remove nss-mdns from `/etc/nsswitch.conf` if you had previously 
-    configured it for .local hostname resolution. Edit the file:
+4.  (Optional) If you had previously configured nss-mdns for `.local` hostname 
+    resolution, remove it from `/etc/nsswitch.conf`. Open the file:
 
     ```bash
     sudo nano /etc/nsswitch.conf
@@ -224,9 +328,9 @@ sudo systemctl enable --now avahi-daemon.service avahi-daemon.socket
 
 Configure Wayland and hardware acceleration globally for Helium.
 
-**Reference:** [CachyOS Wiki - Hardware Acceleration](https://wiki.cachyos.org/configuration/enabling_hardware_acceleration_in_google_chrome/)
+**Reference:** [CachyOS Wiki - Hardware acceleration](https://wiki.cachyos.org/configuration/enabling_hardware_acceleration_in_google_chrome/)
 
-1.  Edit `/etc/environment`:
+1.  Open `/etc/environment`:
 
     ```bash
     sudo nano /etc/environment
@@ -245,10 +349,10 @@ extended period.
 
 To prevent this issue:
 
-1.  In Steam, click **Settings > Interface**.
+1.  In Steam, select **Settings > Interface**.
 2.  Clear the **Enable GPU accelerated rendering in web views** checkbox.
 
-### Disable Steam auto-update on launch (preference)
+### Disable Steam auto-update on launch (optional)
 
 Prevent the Steam bootstrapper from checking for updates every time you launch 
 Steam.
@@ -262,7 +366,8 @@ To disable auto-update on launch:
     ls -ld ~/.local/share/Steam
     ```
 
-2.  Edit `~/.local/share/Steam/steam.cfg`. Create the file if it doesn't exist:
+2.  Open `~/.local/share/Steam/steam.cfg`. If the file doesn't exist, create 
+    it:
 
     ```bash
     nano ~/.local/share/Steam/steam.cfg
@@ -342,9 +447,31 @@ vary significantly based on hardware and network conditions. Apply these
 settings individually and test to determine if they improve your specific 
 situation.
 
-**Important:** These settings were tested for Overwatch 2 packet loss issues 
-but did not resolve that specific problem. They may still be beneficial for 
-other games or network scenarios.
+**Important:** The network interface settings were tested for Overwatch 2 
+packet loss issues but didn't resolve that specific problem. However, the IP 
+TTL fix successfully resolves Overwatch 2 packet loss on Linux.
+
+#### Set IP TTL to 128 (recommended for Overwatch 2)
+
+Setting the IP Time-To-Live (TTL) value to 128 can resolve packet loss issues 
+in Overwatch 2 on Linux. This works because Blizzard's servers expect a TTL 
+value consistent with Windows systems (which default to 128), while Linux 
+defaults to 64.
+
+**Source:** [Blizzard Forums - Overwatch packet loss on Linux](https://us.forums.blizzard.com/en/overwatch/t/consistent-10%E2%80%9320-packet-loss-since-new-season-on-linux/998697/47)
+
+To test if this resolves your packet loss:
+
+```bash
+sudo sysctl -w net.ipv4.ip_default_ttl=128
+```
+
+If this fixes your packet loss, make it permanent:
+
+```bash
+echo 'net.ipv4.ip_default_ttl=128' | sudo tee /etc/sysctl.d/99-default-ttl.conf
+sudo sysctl --system
+```
 
 #### Disable Energy Efficient Ethernet (EEE)
 
@@ -355,8 +482,8 @@ states. Replace `enp6s0` with your interface name:
 sudo ethtool --set-eee enp6s0 eee off
 ```
 
-To make persistent, add to `/etc/systemd/system/network-tuning.service` 
-(create similar to the WoL service in Power Management section).
+To make this persistent, add it to `/etc/systemd/system/network-tuning.service` 
+(create it similar to the WoL service in the Power management section).
 
 #### Disable network offload features
 
@@ -370,7 +497,7 @@ sudo ethtool -K enp6s0 gro off gso off
 
 #### Disable network interface power management
 
-Prevents the network interface from entering power-saving modes:
+Prevent the network interface from entering power-saving modes:
 
 ```bash
 echo "on" | sudo tee /sys/class/net/enp6s0/device/power/control
@@ -388,19 +515,25 @@ sudo ethtool -c enp6s0
 
 ### Fix cursor issues in games with Gamescope
 
-Some games can experience cursor warping, incorrect cursor behavior, or cursor 
-not being properly confined to the game window when running under Gamescope.
+Some games can experience cursor warping, incorrect cursor behavior, or the 
+cursor not being properly confined to the game window when running under 
+Gamescope.
 
-**Source:** [Arch Linux Wiki - Gamescope Cursor Issues](https://wiki.archlinux.org/title/Gamescope#Cursor_doesn't_behave_properly)
+**Source:** [Arch Linux Wiki - Gamescope cursor issues](https://wiki.archlinux.org/title/Gamescope#Cursor_doesn't_behave_properly)
 
 To fix cursor issues, add the following to your Steam launch options:
 
 ```text
-gamescope -f --force-grab-cursor -- %command%
+gamescope -f -r 144 --force-grab-cursor -- %command%
 ```
 
-The `-f` flag enables fullscreen mode, and `--force-grab-cursor` forces the 
-cursor to be grabbed and confined to the game window.
+**Parameter explanations:**
+
+*   `-f`: Enables fullscreen mode.
+*   `-r 144`: Sets refresh rate to 144 Hz. Adjust this value to match your 
+    monitor (for example, 60, 120, 144, 165, or 240).
+*   `--force-grab-cursor`: Forces the cursor to be grabbed and confined to the 
+    game window.
 
 ### Fix alt-tab crashes in games with Gamescope
 
@@ -413,20 +546,22 @@ overhead and potentially minor additional input latency. For most systems and
 games, this overhead is negligible, but it may be noticeable on lower-end 
 hardware or in competitive gaming scenarios where every millisecond matters.
 
-**Sources:** 
-- [Arch Linux Wiki - Gamescope](https://wiki.archlinux.org/title/Gamescope)
+**Source:** [Arch Linux Wiki - Gamescope](https://wiki.archlinux.org/title/Gamescope)
 
-To use Gamescope, add the following to your Steam launch options.
+To use Gamescope, add the following to your Steam launch options:
 
 ```text
-gamescope -W 1920 -H 1080 --adaptive-sync --borderless -- %command%
+gamescope -W 1920 -H 1080 -r 144 --adaptive-sync --borderless -- %command%
 ```
 
 **Parameter explanations:**
 
-- `-W 1920 -H 1080` - Output resolution (the resolution Gamescope displays)
-- `--adaptive-sync` - Enables FreeSync/G-Sync if supported
-- `--borderless` - Runs in borderless window mode
+*   `-W 1920 -H 1080`: Sets output resolution (the resolution Gamescope 
+    displays).
+*   `-r 144`: Sets refresh rate to 144 Hz. Adjust this value to match your 
+    monitor (for example, 60, 120, 144, 165, or 240).
+*   `--adaptive-sync`: Enables FreeSync/G-Sync if your hardware supports it.
+*   `--borderless`: Runs in borderless window mode.
 
 ### Enable NTSync (experimental)
 
@@ -436,17 +571,17 @@ and latency by allowing synchronization operations to run in kernel space
 instead of user space.
 
 **Important:** Performance improvements vary by game. Some games see 
-significant improvements (5-15% FPS gains in CPU-bound scenarios), while others 
+significant improvements (5–15% FPS gains in CPU-bound scenarios), while others 
 see minimal or no benefit. Games that heavily rely on synchronization 
 primitives (such as games with many threads or complex physics) tend to benefit 
 most.
 
-**Source:** [Phoronix - Linux 6.14 NTSYNC Driver](https://www.phoronix.com/news/Linux-6.14-NTSYNC-Driver-Ready)
+**Source:** [Phoronix - Linux 6.14 NTSYNC driver](https://www.phoronix.com/news/Linux-6.14-NTSYNC-Driver-Ready)
 
 To enable NTSync:
 
-1.  Verify that your system supports NTSync (requires Linux kernel 6.14 or 
-    later with NTSync enabled):
+1.  Verify that your system supports NTSync. This requires Linux kernel 6.14 or 
+    later with NTSync enabled:
 
     ```bash
     lsof /dev/ntsync
@@ -464,8 +599,8 @@ To enable NTSync:
 ### Disable Wake-on-LAN (optional)
 
 Wake-on-LAN (WoL) allows a computer to be powered on remotely over the network. 
-Disabling it can prevent spurious wakeups and reduce power consumption when the 
-system is off.
+If you disable it, you can prevent spurious wakeups and reduce power 
+consumption when the system is off.
 
 To disable Wake-on-LAN for your network interface:
 
@@ -475,7 +610,7 @@ To disable Wake-on-LAN for your network interface:
     ip link show
     ```
 
-2.  Disable Wake-on-LAN (replace `enp6s0` with your interface name):
+2.  Disable Wake-on-LAN. Replace `enp6s0` with your interface name:
 
     ```bash
     sudo ethtool -s enp6s0 wol d
@@ -487,7 +622,7 @@ To disable Wake-on-LAN for your network interface:
     sudo nano /etc/systemd/system/disable-wol.service
     ```
 
-4.  Add the following content (replace `enp6s0` with your interface name):
+4.  Add the following content. Replace `enp6s0` with your interface name:
 
     ```ini
     [Unit]
@@ -520,12 +655,12 @@ wake.
 **Why this method works:** This configuration uses USB device authorization 
 control instead of disabling wakeup triggers through `/proc/acpi/wakeup`. The 
 `/proc/acpi/wakeup` method doesn't work reliably for USB devices that trigger 
-spurious wakeups. By directly setting the device's `authorized` attribute to 
+spurious wakeups. When you set the device's `authorized` attribute to 
 `0` before suspend, the USB controller effectively disconnects the device at 
 the hardware level. This prevents the device from generating any wakeup events. 
 After resume, setting `authorized` back to `1` reconnects the device.
 
-**Reference:** See the GPIO interrupt section above for the related Arch Linux 
+**Reference:** See the GPIO interrupt section for the related Arch Linux 
 Wiki article on wakeup triggers, which discusses the broader context of suspend 
 issues on Ryzen 7000 series systems.
 
@@ -613,5 +748,23 @@ USB devices, use:
 lsusb
 ```
 
-Look for entries like `ID 046d:c547` - the part before the colon is the vendor 
+Look for entries like `ID 046d:c547`. The part before the colon is the vendor 
 ID, and the part after is the product ID.
+
+## File reference
+
+The following table lists all files and directories created or modified by the 
+configurations in this guide:
+
+| File path | Purpose | Section |
+|-----------|---------|---------|
+| `/etc/mkinitcpio.conf` | Modified to remove Plymouth from HOOKS array | Remove Plymouth boot splash |
+| `/boot/loader/entries/linux-cachyos.conf` or `/etc/kernel/cmdline` | Modified to add kernel parameters | Add kernel parameters |
+| `/etc/systemd/resolved.conf.d/zz-custom-dns.conf` | Created to override DNS configuration | Override DNS configuration |
+| `/etc/fstab` | Modified to add automount entry for secondary drives | Automount secondary drives |
+| `~/.config/wireplumber/wireplumber.conf.d/90-prevent-adjusting.conf` | Created to prevent microphone auto-adjustment | Prevent microphone auto-adjustment |
+| `~/.local/share/Steam/steam.cfg` | Created or modified to disable Steam auto-update | Disable Steam auto-update |
+| `/etc/sysctl.d/99-default-ttl.conf` | Created to set IP TTL to 128 | Set IP TTL to 128 |
+| `/etc/systemd/system/disable-wol.service` | Created to disable Wake-on-LAN persistently | Disable Wake-on-LAN |
+| `/usr/local/bin/usb-soft-unplug.sh` | Created as USB soft-unplug script | Fix suspend crashes |
+| `/etc/systemd/system/usb-unplug-suspend.service` | Created to run USB soft-unplug on suspend/resume | Fix suspend crashes |
