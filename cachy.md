@@ -459,6 +459,7 @@ value consistent with Windows systems (which default to 128), while Linux
 defaults to 64.
 
 **Source:** [Blizzard Forums - Overwatch packet loss on Linux](https://us.forums.blizzard.com/en/overwatch/t/consistent-10%E2%80%9320-packet-loss-since-new-season-on-linux/998697/47)
+**FIXED:** [Severe latency issues affecting all platforms (and especially PS5) have been resolved.](https://github.com/ValveSoftware/Proton/issues/7033#issuecomment-3891178217)
 
 To test if this resolves your packet loss:
 
