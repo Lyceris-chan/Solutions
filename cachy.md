@@ -459,7 +459,8 @@ value consistent with Windows systems (which default to 128), while Linux
 defaults to 64.
 
 **Source:** [Blizzard Forums - Overwatch packet loss on Linux](https://us.forums.blizzard.com/en/overwatch/t/consistent-10%E2%80%9320-packet-loss-since-new-season-on-linux/998697/47)
-**FIXED:** [Severe latency issues affecting all platforms (and especially PS5) have been resolved.](https://github.com/ValveSoftware/Proton/issues/7033#issuecomment-3891178217)
+
+**Note:** Severe latency issues affecting all platforms (and especially PS5) have been resolved. See [Proton issue #7033](https://github.com/ValveSoftware/Proton/issues/7033#issuecomment-3891178217) for details.
 
 To test if this resolves your packet loss:
 
@@ -514,27 +515,25 @@ sudo ethtool --show-eee enp6s0
 sudo ethtool -c enp6s0
 ```
 
-### Fix cursor issues in games with Gamescope
+### Fix cursor warping in games
 
 Some games can experience cursor warping, incorrect cursor behavior, or the 
 cursor not being properly confined to the game window when running under 
-Gamescope.
+Proton.
 
-**Source:** [Arch Linux Wiki - Gamescope cursor issues](https://wiki.archlinux.org/title/Gamescope#Cursor_doesn't_behave_properly)
+**Source:** [nerdburglars member: TopTierTech](https://nerdburglars.net/question/how-can-i-enable-wine-wayland-for-all-applications/)
 
 To fix cursor issues, add the following to your Steam launch options:
 
 ```text
-gamescope -f -r 144 --force-grab-cursor -- %command%
+WINEDLLOVERRIDES="winex11.drv=;"
 ```
 
 **Parameter explanations:**
 
-*   `-f`: Enables fullscreen mode.
-*   `-r 144`: Sets refresh rate to 144 Hz. Adjust this value to match your 
-    monitor (for example, 60, 120, 144, 165, or 240).
-*   `--force-grab-cursor`: Forces the cursor to be grabbed and confined to the 
-    game window.
+*   `WINEDLLOVERRIDES="winex11.drv=;"`: Disables the winex11 driver, which may 
+    help force Wine into using the Wayland driver instead, depending on how the 
+    launcher initializes Wine.
 
 ### Fix alt-tab crashes in games with Gamescope
 
